@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <title>接口自动化测试平台</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <h1>接口自动化测试平台</h1>
+    <div class="actions">
+      <select id="env-select" onchange="switchEnv()" title="当前执行环境">
+        {% for e in envs %}
+        <option value="{{ e.id }}" {{ 'selected' if current_env and current_env.id==e.id }}>{{ e.name }}</option>
+        {% endfor %}
+      </select>
+      <span class="btn" onclick="location.href='/report'">测试报告</span>
+      <span id="run-all-btn" class="btn primary">运行全部用例</span>
+      <span class="btn" onclick="location.href='/case/0'">+ 新增用例</span>
+    </div>
+  </header>
+
+  <section id="summary"></section>
+
+  <table>
+    <thead><tr><th>顺序</th><th>ID</th><th>用例名</th><th>方法</th><th>接口</th><th>状态</th><th>操作</th></tr></thead>
+    <tbody>
+      {% for c in cases %}
+      <tr data-id="{{ c.id }}">
+        <td>{{ c.get('sort', 0) }}</td>
+        <td>{{ c.id }}</td>
+        <td>{{ c.name }}</td>
+        <td class="m {{ c.method }}">{{ c.method }}</td>
+        <td class="url">{{ c.url }}</td>
+        <td class="st">-</td>
+        <td>
+          <span class="btn" onclick="runOne({{ c.id }})">运行</span>
+          <span class="btn" onclick="location.href='/case/{{ c.id }}'">编辑</span>
+          <span class="btn danger" onclick="delCase({{ c.id }})">删除</span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h2>最近执行结果</h2>
+  <table>
+    <thead><tr><th>用例</th><th>状态码</th><th>结果</th><th>时间</th></tr></thead>
+    <tbody id="res-body"><tr><td colspan="4">暂无记录</td></tr></tbody>
+  </table>
+
+  <h2>定时任务（每日自动回归，失败可Webhook通知）</h2>
+  <form id="sched-form" class="sched-form">
+    <input name="name" placeholder="任务名，如 每晚电商回归">
+    <select name="project">
+      <option value="">全部项目</option>
+      {% for p in projects %}<option>{{ p }}</option>{% endfor %}
+    </select>
+    <input name="hour" type="number" min="0" max="23" placeholder="时" title="每日执行小时">
+    <input name="minute" type="number" min="0" max="59" placeholder="分" title="每日执行分钟">
+    <input name="webhook" placeholder="失败通知Webhook(企业微信/钉钉, 可选)">
+    <button type="submit" class="btn primary">保存</button>
+  </form>
+  <table>
+    <thead><tr><th>任务</th><th>项目</th><th>时间</th><th>Webhook</th><th>状态</th><th>操作</th></tr></thead>
+    <tbody id="sched-body"><tr><td colspan="6">暂无任务</td></tr></tbody>
+  </table>
+
+  <script>
+    async function api(path, opts) {
+      const r = await fetch(path, opts);
+      return r.json();
+    }
+    async function switchEnv() {
+      const sel = document.getElementById('env-select');
+      await api('/api/env/switch', {method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({env_id: sel.value})});
+      location.reload();
+    }
+    function markRow(id, passed, text) {
+      const tr = document.querySelector(`tr[data-id="${id}"]`);
+      if (tr) { tr.querySelector('.st').innerHTML = passed
+          ? '<span class="ok">PASS</span>' : `<span class="fail" title="${text}">FAIL</span>`; }
+    }
+    async function runOne(id) {
+      const r = await api(`/api/run/${id}`, {method:'POST'});
+      if (r.total > 1) {
+        const ok = r.outputs.filter(o => o.passed).length;
+        markRow(id, ok === r.total, `参数化 ${r.total} 条数据: ${ok} 过 ${r.total-ok} 败`);
+      } else {
+        markRow(id, r.passed, r.detail);
+      }
+      loadResults();
+    }
+    async function runAll() {
+      markRow(0, false, '运行中...');
+      const r = await api('/api/run/all', {method:'POST'});
+      document.getElementById('summary').innerHTML =
+        `共 ${r.total} 条, 通过 <b class="ok">${r.passed}</b>, 失败 <b class="fail">${r.failed}</b>`;
+      const byCase = {};
+      r.outputs.forEach(o => { (byCase[o.case.id] ||= []).push(o); });
+      document.querySelectorAll('table tr[data-id]').forEach(tr => {
+        const arr = byCase[tr.dataset.id];
+        if (arr) {
+          const ok = arr.filter(o => o.passed).length;
+          const first = arr[0];
+          if (arr.length === 1) markRow(first.case.id, first.passed, first.detail);
+          else markRow(first.case.id, ok === arr.length,
+            `参数化 ${arr.length} 条数据: ${ok} 过 ${arr.length-ok} 败`);
+        }
+      });
+      loadResults();
+    }
+    async function delCase(id) {
+      if (!confirm('确认删除该用例及其结果？')) return;
+      await api(`/api/case/${id}/delete`, {method:'POST'});
+      location.reload();
+    }
+    async function loadResults() {
+      const rs = await api('/api/results');
+      const tb = document.getElementById('res-body');
+      tb.innerHTML = rs.slice(0,8).map(r => `
+        <tr><td>${r.case_name||r.case_id}</td><td>${r.status_code||''}</td>
+        <td>${r.passed?'<span class="ok">PASS</span>':'<span class="fail">FAIL</span>'}</td>
+        <td>${r.run_at}</td></tr>`).join('');
+    }
+    async function loadSchedules() {
+      const ss = await api('/api/schedules');
+      const tb = document.getElementById('sched-body');
+      tb.innerHTML = ss.map(s => `
+        <tr>
+          <td>${s.name}</td><td>${s.project||'全部'}</td>
+          <td>${String(s.hour).padStart(2,'0')}:${String(s.minute).padStart(2,'0')}</td>
+          <td class="url">${s.webhook||'-'}</td>
+          <td>${s.enabled?'<span class="ok">启用</span>':'<span class="fail">停用</span>'}</td>
+          <td><span class="btn" onclick="delSched(${s.id})">删除</span></td>
+        </tr>`).join('');
+    }
+    async function delSched(id) {
+      if (!confirm('确认删除该定时任务？')) return;
+      await api(`/api/schedule/${id}/delete`, {method:'POST'});
+      loadSchedules();
+    }
+    document.getElementById('run-all-btn').onclick = runAll;
+    document.getElementById('sched-form').onsubmit = async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      await api('/api/schedule', {method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({name:fd.get('name'), project:fd.get('project'),
+          hour:fd.get('hour'), minute:fd.get('minute'), webhook:fd.get('webhook')})});
+      loadSchedules();
+      e.target.reset();
+    };
+    loadResults();
+    loadSchedules();
+  </script>
+</body>
+</html>

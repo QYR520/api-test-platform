@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <title>测试报告</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <h1>测试报告</h1>
+    <div class="actions"><span class="btn" onclick="location.href='/'">返回平台</span></div>
+  </header>
+
+  <section id="cards" class="cards"></section>
+
+  <h2>按项目统计</h2>
+  <table>
+    <thead><tr><th>项目</th><th>用例数</th><th>执行次数</th><th>通过</th><th>通过率</th><th style="width:30%">趋势</th></tr></thead>
+    <tbody id="proj-body"></tbody>
+  </table>
+
+  <h2>近7天执行趋势</h2>
+  <div id="trend" class="trend"></div>
+
+  <h2>最近执行记录</h2>
+  <table>
+    <thead><tr><th>用例</th><th>状态码</th><th>结果</th><th>时间</th></tr></thead>
+    <tbody id="recent-body"></tbody>
+  </table>
+
+  <script>
+    async function load() {
+      const r = await (await fetch('/api/report')).json();
+      document.getElementById('cards').innerHTML = `
+        <div class="card"><div class="num">${r.total_cases}</div><div>用例数</div></div>
+        <div class="card"><div class="num">${r.total_runs}</div><div>执行次数</div></div>
+        <div class="card"><div class="num ${r.pass_rate>=80?'ok':'fail'}">${r.pass_rate??'-'}%</div><div>整体通过率</div></div>`;
+
+      document.getElementById('proj-body').innerHTML = (r.projects||[]).map(p => `
+        <tr>
+          <td>${p.name}</td><td>${p.case_count}</td><td>${p.run_count}</td><td>${p.pass_count}</td>
+          <td>${p.pass_rate==null?'-':p.pass_rate+'%'}</td>
+          <td><div class="bar"><div class="fill ${p.pass_rate>=80?'okbg':p.pass_rate==null?'gray':'failbg'}"
+            style="width:${p.pass_rate??0}%"></div></div></td>
+        </tr>`).join('') || '<tr><td colspan="6">暂无数据</td></tr>';
+
+      const trend = r.trend || [];
+      const max = Math.max(1, ...trend.map(t => t.count));
+      document.getElementById('trend').innerHTML = trend.length ? trend.map(t => `
+        <div class="tcol">
+          <div class="tnum">${t.pass_rate}%</div>
+          <div class="tbar"><div class="fill ${t.pass_rate>=80?'okbg':'failbg'}"
+            style="height:${t.pass_rate}%"></div></div>
+          <div class="tdate">${t.date}</div>
+        </div>`).join('') : '暂无执行记录，运行一次用例后这里会显示趋势';
+
+      document.getElementById('recent-body').innerHTML = (r.recent||[]).map(x => `
+        <tr><td>${x.case_name||x.case_id}</td><td>${x.status_code||''}</td>
+        <td>${x.passed?'<span class="ok">PASS</span>':'<span class="fail">FAIL</span>'}</td>
+        <td>${x.run_at}</td></tr>`).join('') || '<tr><td colspan="4">暂无记录</td></tr>';
+    }
+    load();
+  </script>
+</body>
+</html>

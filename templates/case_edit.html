@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <title>用例编辑</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header><h1>{% if case %}#{{ case.id }} 编辑用例{% else %}新增用例{% endif %}</h1></header>
+  <form id="form">
+    <label>所属项目
+      <select name="project">
+        {% for p in projects %}
+        <option {{ 'selected' if case and case.project==p }}>{{ p }}</option>
+        {% endfor %}
+        {% if case and case.project not in projects %}<option selected>{{ case.project }}</option>{% endif %}
+      </select>
+    </label>
+    <label>执行顺序(小在前，可在流程中间插入)
+      <input name="sort" type="number" step="1" value="{{ case.get('sort', 0) if case else 0 }}">
+    </label>
+    <label>用例名<input name="name" required value="{{ case.name if case else '' }}"></label>
+    <label>方法
+      <select name="method">
+        {% for m in ['GET','POST','PUT','DELETE'] %}
+        <option {{ 'selected' if case and case.method==m }}>{{ m }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>接口地址(支持 ${变量} )<input name="url" required value="{{ case.url if case else '' }}"></label>
+    <label>请求头 JSON<input name="headers" textarea value='{{ case.get("headers","{}") if case else "{}" }}'></label>
+    <label>请求体 JSON<textarea name="body">{{ case.get("body","{}") if case else "{}" }}</textarea></label>
+    <label>断言规则 JSON
+      <textarea name="assertions" rows="4">{{ case.get("assertions","[]") if case else '[{"type":"status_code","expect":200}]' }}</textarea>
+      <small>规则格式: [{"type":"状态码/字段相等/字段存在/文本包含","path":"data.code","expect":0}]
+        type ∈ status_code / json_eq / json_contains / text_contains</small>
+    </label>
+    <label>变量提取 JSON
+      <textarea name="extract" rows="2">{{ case.get("extract","{}") if case else '{"token":"data.token"}' }}</textarea>
+      <small>从响应提取变量供后续用例引用，如 {"token":"data.token"} 后续可用 ${token}</small>
+    </label>
+    <label>参数化数据 JSON（数据驱动）
+      <textarea name="datalist" rows="2">{{ case.get("datalist","[]") if case else '[]' }}</textarea>
+      <small>数组每项=一次执行，字段作为变量注入。如 [{"username":"u1"},{"username":"u2"}]，
+        url/body 里可用 ${username}，一条用例跑多组数据</small>
+    </label>
+    <div class="actions">
+      <button type="submit" class="btn primary">保存</button>
+      <span class="btn" onclick="location.href='/'">返回</span>
+    </div>
+  </form>
+  <script>
+    document.getElementById('form').onsubmit = async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const data = {project:fd.get('project'), sort:fd.get('sort'), name:fd.get('name'), method:fd.get('method'), url:fd.get('url'),
+        headers:fd.get('headers'), body:fd.get('body'),
+        assertions:fd.get('assertions'), extract:fd.get('extract'),
+        datalist:fd.get('datalist')};
+      const id = {{ case.id if case else 0 }};
+      const path = id ? `/api/case/${id}` : '/api/case';
+      const r = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(data)});
+      const j = await r.json();
+      location.href = '/';
+    };
+  </script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+name: 平台测试(CI)
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: 安装依赖
+        run: pip install -r requirements.txt
+      - name: 启动被测电商后端
+        run: |
+          cd ecommerce/backend && npm install --no-audit --no-fund
+          node server.js &
+          sleep 2
+      - name: 运行冒烟测试(引擎+用例数据化+变量传递)
+        run: python run_smoke.py
+      - name: 运行pytest用例
+        run: python -m pytest run_smoke.py -q
+      - name: 电商冒烟回归(真实电商后端)
+        run: python run_ci.py

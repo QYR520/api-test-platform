@@ -1,0 +1,66 @@
+[
+  {
+    "id": 1,
+    "name": "无线蓝牙耳机",
+    "price": 199,
+    "image": "🎧",
+    "stock": 8007,
+    "description": "高清音质，超长续航30小时"
+  },
+  {
+    "id": 2,
+    "name": "机械键盘",
+    "price": 349,
+    "image": "⌨️",
+    "stock": 4028,
+    "description": "青轴手感，RGB背光，87键布局"
+  },
+  {
+    "id": 3,
+    "name": "无线鼠标",
+    "price": 89,
+    "image": "🖱️",
+    "stock": 2626,
+    "description": "人体工学设计，静音按键"
+  },
+  {
+    "id": 4,
+    "name": "移动电源 20000mAh",
+    "price": 129,
+    "image": "🔋",
+    "stock": 2494,
+    "description": "大容量快充，双USB输出"
+  },
+  {
+    "id": 5,
+    "name": "Type-C 数据线",
+    "price": 29.9,
+    "image": "🔌",
+    "stock": 1336,
+    "description": "快充数据线，1.5米编织线"
+  },
+  {
+    "id": 6,
+    "name": "笔记本电脑支架",
+    "price": 79,
+    "image": "💻",
+    "stock": 4000,
+    "description": "铝合金材质，6档高度调节"
+  },
+  {
+    "id": 7,
+    "name": "USB-C 扩展坞",
+    "price": 159,
+    "image": "🔗",
+    "stock": 3500,
+    "description": "7合1接口，HDMI+USB3.0+SD卡"
+  },
+  {
+    "id": 8,
+    "name": "桌面小风扇",
+    "price": 49,
+    "image": "🌀",
+    "stock": 2000,
+    "description": "静音三档风力，USB供电"
+  }
+]
